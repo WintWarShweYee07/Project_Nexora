@@ -7,14 +7,20 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { BookOpen, Clock, Star, TrendingUp, Heart, Bookmark, Share2, Lock, Crown } from "lucide-react"
+import { BookOpen, Clock, Star, TrendingUp, Heart, Bookmark, Share2, Lock, Crown, Settings } from "lucide-react"
 import { DashboardSkeleton } from "@/components/loading-skeleton"
+import { useMembership } from "@/components/membership-provider"
+import { ProfileSettings } from "@/components/profile-settings"
+import { CreatorUpgradeDialog } from "@/components/creator-upgrade-dialog"
 
 export function UserDashboard() {
   const [isLoading, setIsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState("discover")
   const [bookmarkedPosts, setBookmarkedPosts] = useState<number[]>([])
   const [likedPosts, setLikedPosts] = useState<number[]>([])
+  const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const { tier, isPaidMember, startMembershipCheckout, openBillingPortal } = useMembership()
+  const [isCreatorDialogOpen, setIsCreatorDialogOpen] = useState(false)
 
   const handleBookmark = (postId: number) => {
     setBookmarkedPosts((prev) => (prev.includes(postId) ? prev.filter((id) => id !== postId) : [...prev, postId]))
@@ -45,7 +51,6 @@ export function UserDashboard() {
       avatar: "/placeholder.svg?height=40&width=40",
       readTime: "8 min read",
       isPremium: true,
-      price: "$2.99",
       likes: 234,
       category: "Technology",
       excerpt: "Exploring how artificial intelligence is revolutionizing the way we create and consume content...",
@@ -68,7 +73,6 @@ export function UserDashboard() {
       avatar: "/placeholder.svg?height=40&width=40",
       readTime: "12 min read",
       isPremium: true,
-      price: "$4.99",
       likes: 189,
       category: "Programming",
       excerpt: "Deep dive into advanced React patterns that will make your code more maintainable...",
@@ -115,15 +119,26 @@ export function UserDashboard() {
           <h2 className="text-3xl font-bold tracking-tight">Welcome back, John!</h2>
           <p className="text-muted-foreground">Discover amazing content from your favorite creators</p>
         </div>
-        <Button
-          className="gap-2"
-          onClick={() => {
-            alert("Premium upgrade coming soon! Full payment integration with Stripe will be available.")
-          }}
-        >
-          <Crown className="h-4 w-4" />
-          Upgrade to Premium
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" className="gap-2 bg-transparent" onClick={() => setIsProfileOpen(true)}>
+            <Settings className="h-4 w-4" />
+            Profile
+          </Button>
+          {!isPaidMember ? (
+            <Button className="gap-2" onClick={startMembershipCheckout}>
+              <Crown className="h-4 w-4" />
+              Upgrade to Premium
+            </Button>
+          ) : (
+            <Button className="gap-2" variant="secondary" disabled>
+              <Crown className="h-4 w-4" />
+              Premium Active
+            </Button>
+          )}
+          <Button className="gap-2" variant="outline" onClick={() => setIsCreatorDialogOpen(true)}>
+            Become a Creator
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -173,8 +188,8 @@ export function UserDashboard() {
       <Tabs defaultValue="discover" className="space-y-4">
         <TabsList>
           <TabsTrigger value="discover">Discover</TabsTrigger>
-          <TabsTrigger value="reading">Continue Reading</TabsTrigger>
-          <TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>
+          <TabsTrigger value="bookmarks">Bookmarks</TabsTrigger>
+          <TabsTrigger value="subscriptions">Membership</TabsTrigger>
         </TabsList>
 
         <TabsContent value="discover" className="space-y-4">
@@ -244,14 +259,8 @@ export function UserDashboard() {
                         <Share2 className="h-4 w-4" />
                       </Button>
                     </div>
-                    <Button
-                      size="sm"
-                      onClick={() =>
-                        post.isPremium ? handlePurchase(post.id) : alert("Reading functionality coming soon!")
-                      }
-                      disabled={isLoading}
-                    >
-                      {post.isPremium ? "Purchase" : "Read"}
+                    <Button size="sm" asChild>
+                      <a href={`/read/${post.id}?premium=${post.isPremium ? "1" : "0"}`}>Read</a>
                     </Button>
                   </div>
                 </CardContent>
@@ -260,73 +269,109 @@ export function UserDashboard() {
           </div>
         </TabsContent>
 
-        <TabsContent value="reading" className="space-y-4">
-          <h3 className="text-xl font-semibold">Continue Reading</h3>
-          <div className="space-y-4">
-            {readingProgress.map((item, index) => (
-              <Card key={index}>
+        <TabsContent value="bookmarks" className="space-y-4">
+          <h3 className="text-xl font-semibold">Your Bookmarks</h3>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {featuredPosts
+              .filter((p) => bookmarkedPosts.includes(p.id))
+              .map((post) => (
+                <Card key={post.id} className="overflow-hidden">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <Badge variant="secondary">{post.category}</Badge>
+                      {post.isPremium && (
+                        <Badge className="gap-1">
+                          <Lock className="h-3 w-3" />
+                          Premium
+                        </Badge>
+                      )}
+                    </div>
+                    <CardTitle className="line-clamp-2">{post.title}</CardTitle>
+                    <CardDescription className="line-clamp-2">{post.excerpt}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-6 w-6">
+                          <AvatarImage src={post.avatar || "/placeholder.svg"} />
+                          <AvatarFallback>{post.author[0]}</AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm text-muted-foreground">{post.author}</span>
+                      </div>
+                      <span className="text-sm text-muted-foreground">{post.readTime}</span>
+                    </div>
+                    <div className="mt-4 flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <button
+                          className="flex items-center gap-1 hover:text-red-500 transition-colors"
+                          onClick={() => handleLike(post.id)}
+                        >
+                          <Heart className={`h-4 w-4 ${likedPosts.includes(post.id) ? "fill-red-500 text-red-500" : ""}`} />
+                          <span className="text-sm">{post.likes + (likedPosts.includes(post.id) ? 1 : 0)}</span>
+                        </button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleBookmark(post.id)}
+                          className={bookmarkedPosts.includes(post.id) ? "text-blue-500" : ""}
+                        >
+                          <Bookmark className={`h-4 w-4 ${bookmarkedPosts.includes(post.id) ? "fill-current" : ""}`} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            navigator.share?.({ title: post.title, url: window.location.href }) || alert("Share functionality coming soon!")
+                          }}
+                        >
+                          <Share2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <Button size="sm" asChild>
+                        <a href={`/read/${post.id}?premium=${post.isPremium ? "1" : "0"}`}>Read</a>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            {bookmarkedPosts.length === 0 && (
+              <Card>
                 <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <h4 className="font-medium">{item.title}</h4>
-                      <p className="text-sm text-muted-foreground">by {item.author}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-medium">{item.progress}% complete</p>
-                      <p className="text-xs text-muted-foreground">{item.timeLeft}</p>
-                    </div>
-                  </div>
-                  <Progress value={item.progress} className="mt-3" />
-                  <Button className="mt-3 w-full bg-transparent" variant="outline">
-                    Continue Reading
-                  </Button>
+                  <p className="text-sm text-muted-foreground">No bookmarks yet. Save articles to see them here.</p>
                 </CardContent>
               </Card>
-            ))}
+            )}
           </div>
         </TabsContent>
 
         <TabsContent value="subscriptions" className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xl font-semibold">Your Subscriptions</h3>
-            <Button variant="outline" size="sm">
-              Manage All
-            </Button>
-          </div>
-          <div className="space-y-4">
-            {subscriptions.map((sub, index) => (
-              <Card key={index}>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Avatar>
-                        <AvatarImage src={sub.avatar || "/placeholder.svg"} />
-                        <AvatarFallback>{sub.author[0]}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <h4 className="font-medium">{sub.author}</h4>
-                        <p className="text-sm text-muted-foreground">{sub.plan} Plan</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium">{sub.price}</p>
-                      <p className="text-xs text-muted-foreground">Next billing: {sub.nextBilling}</p>
-                    </div>
-                  </div>
-                  <div className="mt-4 flex gap-2">
-                    <Button variant="outline" size="sm">
-                      Manage
-                    </Button>
-                    <Button variant="ghost" size="sm">
-                      Cancel
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          <h3 className="text-xl font-semibold">Your Membership</h3>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-medium">Plan</h4>
+                  <p className="text-sm text-muted-foreground capitalize">{tier}</p>
+                </div>
+                <div className="text-right">
+                  <p className="font-medium">${isPaidMember ? "9.99" : "0.00"}/month</p>
+                  <p className="text-xs text-muted-foreground">Billed monthly</p>
+                </div>
+              </div>
+              <div className="mt-4 flex gap-2">
+                {!isPaidMember ? (
+                  <Button onClick={startMembershipCheckout}>Upgrade to Premium</Button>
+                ) : (
+                  <Button variant="outline" onClick={openBillingPortal}>Manage Billing</Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
+
+      <ProfileSettings open={isProfileOpen} onOpenChange={setIsProfileOpen} />
+      <CreatorUpgradeDialog open={isCreatorDialogOpen} onOpenChange={setIsCreatorDialogOpen} />
     </div>
   )
 }

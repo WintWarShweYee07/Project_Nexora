@@ -23,10 +23,12 @@ import {
   Target,
   Award,
 } from "lucide-react"
+import { useMembership } from "@/components/membership-provider"
 
 export function LandingPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
+  const { isPaidMember, upgradeToMember } = useMembership()
 
   const categories = [
     { id: "all", name: "All", count: 1247 },
@@ -51,7 +53,6 @@ export function LandingPage() {
       likes: 234,
       comments: 45,
       isPremium: true,
-      price: "$2.99",
       coverImage: "/placeholder.svg?height=200&width=400&text=AI+Content+Creation",
     },
     {
@@ -82,7 +83,6 @@ export function LandingPage() {
       likes: 312,
       comments: 67,
       isPremium: true,
-      price: "$4.99",
       coverImage: "/placeholder.svg?height=200&width=400&text=React+Patterns",
     },
   ]
@@ -137,7 +137,7 @@ export function LandingPage() {
           <div className="max-w-3xl">
             <Badge className="mb-4 gap-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white border-0">
               <Zap className="h-3 w-3" />
-              Welcome to UiTBlog
+              Welcome to Nexora
             </Badge>
             <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6 bg-gradient-to-r from-gray-900 via-purple-900 to-blue-900 dark:from-white dark:via-purple-100 dark:to-blue-100 bg-clip-text text-transparent">
               Discover Amazing Content from Top Creators
@@ -150,9 +150,10 @@ export function LandingPage() {
               <Button
                 size="lg"
                 className="gap-2 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
+                onClick={!isPaidMember ? upgradeToMember : undefined}
               >
                 <Target className="h-5 w-5" />
-                Start Reading
+                {isPaidMember ? "Start Reading" : "Upgrade & Start Reading"}
                 <ArrowRight className="h-4 w-4" />
               </Button>
               <Button size="lg" variant="outline" className="gap-2 bg-transparent">
@@ -240,7 +241,7 @@ export function LandingPage() {
                 {post.isPremium && (
                   <Badge className="absolute top-3 right-3 gap-1 bg-gradient-to-r from-yellow-500 to-orange-500 text-white border-0">
                     <Crown className="h-3 w-3" />
-                    {post.price}
+                    Premium
                   </Badge>
                 )}
                 <Badge className="absolute top-3 left-3" variant="secondary">
@@ -286,7 +287,9 @@ export function LandingPage() {
                     <Button variant="ghost" size="sm">
                       <Share2 className="h-4 w-4" />
                     </Button>
-                    <Button size="sm">{post.isPremium ? "Purchase" : "Read"}</Button>
+                    <Button size="sm" asChild>
+                      <a href={`/read/${post.id}?premium=${post.isPremium ? "1" : "0"}`}>Read</a>
+                    </Button>
                   </div>
                 </div>
               </CardContent>

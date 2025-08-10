@@ -27,7 +27,7 @@ export function Chatbot({ isOpen, onClose }: ChatbotProps) {
     {
       id: "1",
       content:
-        "👋 Hi! I'm your UiTBlog AI assistant. I can help you with:\n\n• Creating and managing content\n• Payment and subscription questions\n• Platform features and navigation\n• Technical support\n• Community guidelines\n\nWhat would you like to know?",
+        "👋 Hi! I'm your Nexora AI assistant. I can help you with:\n\n• Creating and managing content\n• Payment and subscription questions\n• Platform features and navigation\n• Technical support\n• Community guidelines\n\nWhat would you like to know?",
       sender: "bot",
       timestamp: new Date(),
       suggestions: [
@@ -41,6 +41,11 @@ export function Chatbot({ isOpen, onClose }: ChatbotProps) {
   const [inputValue, setInputValue] = useState("")
   const [isTyping, setIsTyping] = useState(false)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
+
+  // Finetuned model API configuration (must be set in env.local with NEXT_PUBLIC_* to be available client-side)
+  const apiUrl = process.env.NEXT_PUBLIC_MISTRAL_API_URL || "https://api.mistral.ai/v1/chat/completions"
+  const apiKey = process.env.NEXT_PUBLIC_MISTRAL_API_KEY || ""
+  const apiModel = process.env.NEXT_PUBLIC_MISTRAL_MODEL || "mistral-large-latest"
 
   const quickActions = [
     { icon: CreditCard, label: "Billing Help", query: "I need help with billing" },
@@ -69,23 +74,63 @@ export function Chatbot({ isOpen, onClose }: ChatbotProps) {
     setInputValue("")
     setIsTyping(true)
 
-    // Simulate bot response
-    setTimeout(
-      () => {
-        const botResponse = generateBotResponse(content)
-        const botMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          content: botResponse.content,
-          sender: "bot",
-          timestamp: new Date(),
-          suggestions: botResponse.suggestions,
-        }
+    // Try finetuned API first; fallback to local canned responses if not configured or if call fails
+    try {
+      const assistantText = await callFinetunedAssistant([...messages, userMessage])
+      const botMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: assistantText,
+        sender: "bot",
+        timestamp: new Date(),
+      }
+      setMessages((prev) => [...prev, botMessage])
+      setIsTyping(false)
+    } catch (err) {
+      // Fallback to built-in heuristic bot
+      const botResponse = generateBotResponse(content)
+      const botMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: botResponse.content,
+        sender: "bot",
+        timestamp: new Date(),
+        suggestions: botResponse.suggestions,
+      }
+      setMessages((prev) => [...prev, botMessage])
+      setIsTyping(false)
+    }
+  }
 
-        setMessages((prev) => [...prev, botMessage])
-        setIsTyping(false)
+  async function callFinetunedAssistant(history: Message[]): Promise<string> {
+    if (!apiKey) throw new Error("LLM API key missing")
+    const system = `You are Nexora's helpful assistant. Nexora is a subscription platform created for UiT SE ADBMS Course (CS-7313) by Wint War Shwe Yee, Naw Lal Yee Than Han, Chaw Su Han, Kaung Myat Thu, Kaung Kyaw Han. Be concise and accurate about membership, billing portal, premium gating, bookmarks, and dashboards.`
+
+    const chatMessages = [
+      { role: "system", content: system },
+      ...history.map((m) => ({ role: m.sender === "user" ? "user" : "assistant", content: m.content })),
+    ]
+
+    const res = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
       },
-      1000 + Math.random() * 1000,
-    )
+      body: JSON.stringify({
+        model: apiModel,
+        messages: chatMessages,
+        temperature: 0.3,
+      }),
+    })
+
+    if (!res.ok) {
+      const text = await res.text()
+      throw new Error(`LLM error ${res.status}: ${text}`)
+    }
+    const data = await res.json()
+    // Mistral chat completions: choices[0].message.content
+    const content = data?.choices?.[0]?.message?.content || data?.choices?.[0]?.delta?.content || ""
+    if (!content) throw new Error("Empty LLM response")
+    return content
   }
 
   const generateBotResponse = (userInput: string): { content: string; suggestions?: string[] } => {
@@ -174,7 +219,7 @@ export function Chatbot({ isOpen, onClose }: ChatbotProps) {
                 <Bot className="h-5 w-5 text-white" />
               </div>
               <div>
-                <DialogTitle className="text-lg font-bold">CreatorBot AI Assistant</DialogTitle>
+                <DialogTitle className="text-lg font-bold">Nexora AI Assistant</DialogTitle>
                 <DialogDescription className="text-sm">
                   Get instant help with platform features & support
                 </DialogDescription>
@@ -203,9 +248,8 @@ export function Chatbot({ isOpen, onClose }: ChatbotProps) {
                     </Avatar>
                   )}
                   <div
-                    className={`max-w-[80%] rounded-lg px-3 py-2 ${
-                      message.sender === "user" ? "bg-primary text-primary-foreground" : "bg-muted"
-                    }`}
+                    className={`max-w-[80%] rounded-lg px-3 py-2 ${message.sender === "user" ? "bg-primary text-primary-foreground" : "bg-muted"
+                      }`}
                   >
                     <p className="text-sm">{message.content}</p>
                     {message.suggestions && (

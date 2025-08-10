@@ -9,10 +9,12 @@ import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PenTool, Eye, DollarSign, Users, TrendingUp, Calendar, Heart, MessageCircle, Edit, Trash2 } from "lucide-react"
 import { ContentSkeleton } from "@/components/loading-skeleton"
+import { useMembership } from "@/components/membership-provider"
 
 export function CreatorDashboard() {
   const [isLoading, setIsLoading] = useState(false)
   const [selectedPost, setSelectedPost] = useState<number | null>(null)
+  const { isPaidMember } = useMembership()
 
   const handleEdit = (postId: number) => {
     setSelectedPost(postId)
@@ -166,7 +168,7 @@ export function CreatorDashboard() {
 
         <TabsContent value="posts" className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-xl font-semibold">Recent Posts</h3>
+            <h3 className="text-xl font-semibold">My Posts</h3>
             <Button variant="outline" size="sm">
               <Calendar className="mr-2 h-4 w-4" />
               Schedule Post

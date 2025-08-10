@@ -149,7 +149,7 @@ export function AdminDashboard() {
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="users">User Management</TabsTrigger>
           <TabsTrigger value="content">Content Moderation</TabsTrigger>
-          <TabsTrigger value="revenue">Revenue Analytics</TabsTrigger>
+          <TabsTrigger value="revenue">Membership Revenue</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">

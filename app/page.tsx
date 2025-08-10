@@ -6,10 +6,12 @@ import { UserDashboard } from "@/components/user-dashboard"
 import { CreatorDashboard } from "@/components/creator-dashboard"
 import { AdminDashboard } from "@/components/admin-dashboard"
 import { LandingPage } from "@/components/landing-page"
+import { useMembership } from "@/components/membership-provider"
 
 export default function Dashboard() {
   const [userType, setUserType] = useState<"user" | "creator" | "admin">("user")
   const [currentView, setCurrentView] = useState<"landing" | "dashboard">("landing")
+  const { tier } = useMembership()
 
   const renderContent = () => {
     if (currentView === "landing") {
@@ -20,6 +22,7 @@ export default function Dashboard() {
       case "user":
         return <UserDashboard />
       case "creator":
+        // Creator can browse like reader; reuse user dashboard when not managing own content
         return <CreatorDashboard />
       case "admin":
         return <AdminDashboard />
