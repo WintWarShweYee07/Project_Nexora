@@ -2,22 +2,10 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
 
-type MembershipTier = "free" | "member" | "creator"
+const MembershipContext = createContext(null)
 
-type MembershipContextValue = {
-    tier: MembershipTier
-    isPaidMember: boolean
-    startMembershipCheckout: () => Promise<void>
-    openBillingPortal: () => Promise<void>
-    upgradeToMember: () => Promise<void>
-    upgradeToCreator: () => Promise<void>
-    cancelMembership: () => Promise<void>
-}
-
-const MembershipContext = createContext<MembershipContextValue | null>(null)
-
-export function MembershipProvider({ children }: { children: React.ReactNode }) {
-    const [tier, setTier] = useState<MembershipTier>("free")
+export function MembershipProvider({ children }) {
+    const [tier, setTier] = useState("free")
 
     // Restore persisted tier
     useEffect(() => {
@@ -88,7 +76,7 @@ export function MembershipProvider({ children }: { children: React.ReactNode }) 
         }
     }, [])
 
-    const value = useMemo<MembershipContextValue>(
+    const value = useMemo(
         () => ({
             tier,
             isPaidMember: tier === "member" || tier === "creator",
@@ -109,5 +97,3 @@ export function useMembership() {
     if (!ctx) throw new Error("useMembership must be used within a MembershipProvider")
     return ctx
 }
-
-

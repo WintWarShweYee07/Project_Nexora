@@ -6,12 +6,7 @@ import { Button } from "@/components/ui/button"
 import { useMembership } from "@/components/membership-provider"
 import { Crown } from "lucide-react"
 
-type CreatorUpgradeDialogProps = {
-    open: boolean
-    onOpenChange: (open: boolean) => void
-}
-
-export function CreatorUpgradeDialog({ open, onOpenChange }: CreatorUpgradeDialogProps) {
+export function CreatorUpgradeDialog({ open, onOpenChange }) {
     const { upgradeToCreator } = useMembership()
     const [isProcessing, setIsProcessing] = useState(false)
 
@@ -61,5 +56,3 @@ export function CreatorUpgradeDialog({ open, onOpenChange }: CreatorUpgradeDialo
         </Dialog>
     )
 }
-
-

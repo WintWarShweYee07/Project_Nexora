@@ -1,5 +1,4 @@
-import type React from "react"
-import type { Metadata } from "next"
+import React from "react"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -8,7 +7,7 @@ import { HydrationGate } from "@/components/hydration-gate"
 
 const inter = Inter({ subsets: ["latin"] })
 
-export const metadata: Metadata = {
+export const metadata = {
   title: "Nexora Dashboard",
   description: "Modern creator blog platform with advanced content editor",
   generator: 'v0.dev'
@@ -16,8 +15,6 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: {
-  children: React.ReactNode
 }) {
   return (
     <html lang="en" suppressHydrationWarning>

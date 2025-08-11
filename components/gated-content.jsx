@@ -4,13 +4,7 @@ import { useMembership } from "@/components/membership-provider"
 import { Button } from "@/components/ui/button"
 import { Crown } from "lucide-react"
 
-type GatedContentProps = {
-    title: string
-    author?: string
-    content: string
-}
-
-export function GatedContent({ title, author, content }: GatedContentProps) {
+export function GatedContent({ title, author, content }) {
     const { isPaidMember, upgradeToMember } = useMembership()
 
     const midpoint = Math.max(80, Math.floor(content.length * 0.5))
@@ -39,5 +33,3 @@ export function GatedContent({ title, author, content }: GatedContentProps) {
         </div>
     )
 }
-
-

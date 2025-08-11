@@ -8,12 +8,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 
-type ProfileSettingsProps = {
-    open: boolean
-    onOpenChange: (open: boolean) => void
-}
-
-export function ProfileSettings({ open, onOpenChange }: ProfileSettingsProps) {
+export function ProfileSettings({ open, onOpenChange }) {
     const [name, setName] = useState("John Doe")
     const [email, setEmail] = useState("john@example.com")
     const [bio, setBio] = useState("Curious reader and lifelong learner.")
@@ -64,5 +59,3 @@ export function ProfileSettings({ open, onOpenChange }: ProfileSettingsProps) {
         </Dialog>
     )
 }
-
-

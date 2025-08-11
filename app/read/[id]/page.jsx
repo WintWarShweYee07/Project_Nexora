@@ -5,7 +5,7 @@ import { useParams, useSearchParams } from "next/navigation"
 import { GatedContent } from "@/components/gated-content"
 
 export default function ReadPage() {
-    const params = useParams<{ id: string }>()
+    const params = useParams()
     const postId = params?.id || "1"
     const searchParams = useSearchParams()
     const isPremium = searchParams?.get("premium") === "1"
@@ -34,5 +34,3 @@ export default function ReadPage() {
         </div>
     )
 }
-
-

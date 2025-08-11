@@ -2,15 +2,15 @@
 
 import { useState } from "react"
 import { DashboardLayout } from "@/components/dashboard-layout"
-import { UserDashboard } from "@/components/user-dashboard"
-import { CreatorDashboard } from "@/components/creator-dashboard"
-import { AdminDashboard } from "@/components/admin-dashboard"
+import UserDashboard from "@/components/user-dashboard"
+import CreatorDashboard from "@/components/creator-dashboard"
+import AdminDashboard from "@/components/admin-dashboard"
 import { LandingPage } from "@/components/landing-page"
 import { useMembership } from "@/components/membership-provider"
 
 export default function Dashboard() {
-  const [userType, setUserType] = useState<"user" | "creator" | "admin">("user")
-  const [currentView, setCurrentView] = useState<"landing" | "dashboard">("landing")
+  const [userType, setUserType] = useState("user")
+  const [currentView, setCurrentView] = useState("landing")
   const { tier } = useMembership()
 
   const renderContent = () => {
