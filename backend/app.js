@@ -12,7 +12,7 @@ import publicRoutes from './controller/PublicResController.js';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 // Middleware
 app.use(cors());
@@ -26,7 +26,7 @@ app.use('/api/public', publicRoutes);
 
 // Health check endpoint
 app.get('/', (req, res) => {
-  res.json({ 
+  res.json({
     message: 'Backend server is running successfully!',
     status: 'OK',
     timestamp: new Date().toISOString()

@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -19,61 +20,107 @@ import {
   XCircle,
   Flag,
 } from "lucide-react"
-import { useState } from "react"
+import { dashboardApi, postApi, User, Post, Subscription } from "@/lib/api"
 
 export function AdminDashboard() {
-  const [selectedUser, setSelectedUser] = useState<number | null>(null)
-  const [moderationActions, setModerationActions] = useState<{ [key: number]: string }>({})
+  const [isLoading, setIsLoading] = useState(true)
+  const [isActionLoading, setIsActionLoading] = useState(false)
+  const [selectedUser, setSelectedUser] = useState<string | null>(null)
+  const [moderationActions, setModerationActions] = useState<{ [key: string]: string }>({})
+  const [users, setUsers] = useState<User[]>([])
+  const [posts, setPosts] = useState<Post[]>([])
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([])
+  const [dashboardData, setDashboardData] = useState<any>(null)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleUserAction = (userId: number, action: string) => {
+  // Fetch admin dashboard data on component mount
+  useEffect(() => {
+    fetchAdminData()
+  }, [])
+
+  const fetchAdminData = async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
+
+      // Fetch dashboard data, posts, and subscriptions in parallel
+      const [dashboard, postsData, subscriptionsData] = await Promise.all([
+        dashboardApi.getDashboardData(),
+        postApi.getAllPosts(),
+        dashboardApi.getSubscriptions()
+      ])
+
+      setDashboardData(dashboard)
+      setPosts(postsData)
+      setSubscriptions(subscriptionsData)
+
+      // For demo purposes, create some mock users since we don't have a users API yet
+      setUsers([
+        {
+          _id: "1",
+          username: "Alice Johnson",
+          email: "alice@example.com",
+          role: "creator",
+          profilePic: "/placeholder.svg?height=32&width=32",
+        },
+        {
+          _id: "2",
+          username: "Bob Smith",
+          email: "bob@example.com",
+          role: "user",
+          profilePic: "/placeholder.svg?height=32&width=32",
+        },
+        {
+          _id: "3",
+          username: "Carol Davis",
+          email: "carol@example.com",
+          role: "creator",
+          profilePic: "/placeholder.svg?height=32&width=32",
+        },
+      ])
+    } catch (err) {
+      console.error('Failed to fetch admin data:', err)
+      setError(err instanceof Error ? err.message : 'Failed to load admin data')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleUserAction = (userId: string, action: string) => {
     alert(`${action} functionality coming soon! This will integrate with your user management system.`)
   }
 
-  const handleModerationAction = (itemId: number, action: string) => {
+  const handleModerationAction = (itemId: string, action: string) => {
     setModerationActions((prev) => ({ ...prev, [itemId]: action }))
     alert(`Content ${action} functionality coming soon! This will integrate with your moderation system.`)
   }
 
-  const platformStats = [
-    { label: "Total Users", value: "12,847", change: "+18%", icon: Users },
-    { label: "Total Posts", value: "3,456", change: "+12%", icon: BookOpen },
-    { label: "Platform Revenue", value: "$45,678", change: "+25%", icon: DollarSign },
-    { label: "Growth Rate", value: "8.2%", change: "+2.1%", icon: TrendingUp },
-  ]
+  // Calculate platform statistics from real data
+  const calculatePlatformStats = () => {
+    const totalUsers = users.length
+    const totalPosts = posts.length
+    const totalSubscriptions = subscriptions.length
+    const platformRevenue = subscriptions.reduce((sum, sub) => {
+      if (sub.status === 'active') {
+        return sum + (sub.price * 0.2) // 20% platform fee
+      }
+      return sum
+    }, 0)
 
-  const recentUsers = [
-    {
-      id: 1,
-      name: "Alice Johnson",
-      email: "alice@example.com",
-      type: "Creator",
-      joinedAt: "2024-01-15",
-      status: "active",
-      avatar: "/placeholder.svg?height=32&width=32",
-    },
-    {
-      id: 2,
-      name: "Bob Smith",
-      email: "bob@example.com",
-      type: "Reader",
-      joinedAt: "2024-01-14",
-      status: "active",
-      avatar: "/placeholder.svg?height=32&width=32",
-    },
-    {
-      id: 3,
-      name: "Carol Davis",
-      email: "carol@example.com",
-      type: "Creator",
-      joinedAt: "2024-01-13",
-      status: "suspended",
-      avatar: "/placeholder.svg?height=32&width=32",
-    },
-  ]
+    return {
+      totalUsers,
+      totalPosts,
+      totalSubscriptions,
+      platformRevenue: platformRevenue.toFixed(2)
+    }
+  }
 
+  const platformStats = calculatePlatformStats()
+
+  // Mock content moderation data (since we don't have a moderation API yet)
   const contentModeration = [
     {
-      id: 1,
+      id: "1",
       title: "Controversial Political Opinion",
       author: "John Writer",
       reportedBy: "User123",
@@ -82,7 +129,7 @@ export function AdminDashboard() {
       reportedAt: "2024-01-15",
     },
     {
-      id: 2,
+      id: "2",
       title: "Spam Marketing Post",
       author: "Spammer99",
       reportedBy: "Multiple users",
@@ -91,7 +138,7 @@ export function AdminDashboard() {
       reportedAt: "2024-01-14",
     },
     {
-      id: 3,
+      id: "3",
       title: "Misleading Health Claims",
       author: "HealthGuru",
       reportedBy: "Dr. Smith",
@@ -101,12 +148,30 @@ export function AdminDashboard() {
     },
   ]
 
-  const revenueData = [
-    { month: "Jan", revenue: 35000, creators: 2800, platform: 7000 },
-    { month: "Feb", revenue: 42000, creators: 3360, platform: 8400 },
-    { month: "Mar", revenue: 38000, creators: 3040, platform: 7600 },
-    { month: "Apr", revenue: 45000, creators: 3600, platform: 9000 },
-  ]
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-8">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Loading admin dashboard...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-8">
+          <h2 className="text-2xl font-bold text-red-600">Error Loading Admin Dashboard</h2>
+          <p className="text-muted-foreground mt-2">{error}</p>
+          <Button onClick={fetchAdminData} className="mt-4">
+            Try Again
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -130,18 +195,46 @@ export function AdminDashboard() {
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {platformStats.map((stat, index) => (
-          <Card key={index}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{stat.label}</CardTitle>
-              <stat.icon className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
-              <p className="text-xs text-muted-foreground">{stat.change} from last month</p>
-            </CardContent>
-          </Card>
-        ))}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{platformStats.totalUsers}</div>
+            <p className="text-xs text-muted-foreground">Registered users</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Posts</CardTitle>
+            <BookOpen className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{platformStats.totalPosts}</div>
+            <p className="text-xs text-muted-foreground">Published content</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Platform Revenue</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">${platformStats.platformRevenue}</div>
+            <p className="text-xs text-muted-foreground">20% platform share</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Subscriptions</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{platformStats.totalSubscriptions}</div>
+            <p className="text-xs text-muted-foreground">Active memberships</p>
+          </CardContent>
+        </Card>
       </div>
 
       <Tabs defaultValue="overview" className="space-y-4">
@@ -200,7 +293,7 @@ export function AdminDashboard() {
                 <div className="flex items-center gap-3">
                   <div className="h-2 w-2 rounded-full bg-green-500" />
                   <div className="flex-1">
-                    <p className="text-sm">New creator joined: Sarah Johnson</p>
+                    <p className="text-sm">New creator joined: {users.find(u => u.role === 'creator')?.username || 'Unknown'}</p>
                     <p className="text-xs text-muted-foreground">2 minutes ago</p>
                   </div>
                 </div>
@@ -239,27 +332,27 @@ export function AdminDashboard() {
             </Button>
           </div>
           <div className="space-y-4">
-            {recentUsers.map((user) => (
-              <Card key={user.id}>
+            {users.map((user) => (
+              <Card key={user._id}>
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <Avatar>
-                        <AvatarImage src={user.avatar || "/placeholder.svg"} />
-                        <AvatarFallback>{user.name[0]}</AvatarFallback>
+                        <AvatarImage src={user.profilePic || "/placeholder.svg"} />
+                        <AvatarFallback>{user.username[0]}</AvatarFallback>
                       </Avatar>
                       <div>
-                        <h4 className="font-medium">{user.name}</h4>
+                        <h4 className="font-medium">{user.username}</h4>
                         <p className="text-sm text-muted-foreground">{user.email}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge variant={user.type === "Creator" ? "default" : "secondary"}>{user.type}</Badge>
-                      <Badge variant={user.status === "active" ? "default" : "destructive"}>{user.status}</Badge>
+                      <Badge variant={user.role === "creator" ? "default" : "secondary"}>{user.role}</Badge>
+                      <Badge variant="default">active</Badge>
                     </div>
                   </div>
                   <div className="mt-4 flex items-center justify-between">
-                    <p className="text-sm text-muted-foreground">Joined {user.joinedAt}</p>
+                    <p className="text-sm text-muted-foreground">User ID: {user._id}</p>
                     <div className="flex gap-2">
                       <Button variant="ghost" size="sm">
                         <Eye className="h-4 w-4" />
@@ -344,8 +437,8 @@ export function AdminDashboard() {
                 <CardDescription>This month</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">$45,678</div>
-                <p className="text-xs text-muted-foreground">+25% from last month</p>
+                <div className="text-2xl font-bold">${platformStats.platformRevenue}</div>
+                <p className="text-xs text-muted-foreground">From active subscriptions</p>
               </CardContent>
             </Card>
             <Card>
@@ -354,7 +447,9 @@ export function AdminDashboard() {
                 <CardDescription>80% revenue share</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">$36,542</div>
+                <div className="text-2xl font-bold">
+                  ${(parseFloat(platformStats.platformRevenue) * 4).toFixed(2)}
+                </div>
                 <p className="text-xs text-muted-foreground">Paid to creators</p>
               </CardContent>
             </Card>
@@ -364,37 +459,40 @@ export function AdminDashboard() {
                 <CardDescription>20% platform share</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">$9,136</div>
+                <div className="text-2xl font-bold">${platformStats.platformRevenue}</div>
                 <p className="text-xs text-muted-foreground">Platform revenue</p>
               </CardContent>
             </Card>
           </div>
           <Card>
             <CardHeader>
-              <CardTitle>Monthly Revenue Breakdown</CardTitle>
-              <CardDescription>Revenue distribution over time</CardDescription>
+              <CardTitle>Subscription Breakdown</CardTitle>
+              <CardDescription>Active subscriptions by plan</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {revenueData.map((data, index) => (
-                  <div key={index} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">{data.month}</span>
-                      <span className="text-sm font-bold">${data.revenue.toLocaleString()}</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">Creators (80%)</span>
-                        <span>${data.creators.toLocaleString()}</span>
+                {subscriptions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No active subscriptions yet.
+                  </p>
+                ) : (
+                  subscriptions.map((subscription) => (
+                    <div key={subscription._id} className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">{subscription.plan} Plan</p>
+                        <p className="text-sm text-muted-foreground">
+                          Subscriber: {subscription.subscriber}
+                        </p>
                       </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">Platform (20%)</span>
-                        <span>${data.platform.toLocaleString()}</span>
+                      <div className="text-right">
+                        <p className="font-medium">${subscription.price}/month</p>
+                        <p className="text-xs text-muted-foreground">
+                          Status: {subscription.status}
+                        </p>
                       </div>
                     </div>
-                    <Progress value={(data.revenue / 50000) * 100} />
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>

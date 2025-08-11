@@ -8,18 +8,18 @@ import { body, validationResult } from "express-validator";
 // Use memory storage instead of saving to disk
 const storage = multer.memoryStorage();
 
-export const upload = multer({ storage }); // e.g. upload.single('profilePic')
-   
+const upload = multer({ storage }); // e.g. upload.single('profilePic')
+
 
 /* ──────────────────────────────────────────────────────────
    2)  REGISTRATION PARSER  (no files, just fields)
    ────────────────────────────────────────────────────────── */
-export const parse = multer().none(); // parses multipart/form-data fields only
+const parse = multer().none(); // parses multipart/form-data fields only
 
 /* ──────────────────────────────────────────────────────────
    3)  REGISTRATION VALIDATION  (email & password)
    ────────────────────────────────────────────────────────── */
-export const validate = [
+const validate = [
   body("email")
     .trim()
     .isEmail()
@@ -40,6 +40,9 @@ export const validate = [
 ];
 
 /* ──────────────────────────────────────────────────────────
-   4)  Default export kept for backward compatibility
+   4)  Export all middleware functions
    ────────────────────────────────────────────────────────── */
+export { upload, parse, validate };
+
+// Default export kept for backward compatibility
 export default upload;

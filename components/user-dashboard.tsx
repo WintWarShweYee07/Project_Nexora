@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -12,25 +12,89 @@ import { DashboardSkeleton } from "@/components/loading-skeleton"
 import { useMembership } from "@/components/membership-provider"
 import { ProfileSettings } from "@/components/profile-settings"
 import { CreatorUpgradeDialog } from "@/components/creator-upgrade-dialog"
+import { dashboardApi, postApi, Post, User, Subscription } from "@/lib/api"
 
 export function UserDashboard() {
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isActionLoading, setIsActionLoading] = useState(false)
   const [activeTab, setActiveTab] = useState("discover")
-  const [bookmarkedPosts, setBookmarkedPosts] = useState<number[]>([])
-  const [likedPosts, setLikedPosts] = useState<number[]>([])
+  const [bookmarkedPosts, setBookmarkedPosts] = useState<string[]>([])
+  const [likedPosts, setLikedPosts] = useState<string[]>([])
   const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const [posts, setPosts] = useState<Post[]>([])
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([])
+  const [dashboardData, setDashboardData] = useState<any>(null)
+  const [error, setError] = useState<string | null>(null)
   const { tier, isPaidMember, startMembershipCheckout, openBillingPortal } = useMembership()
   const [isCreatorDialogOpen, setIsCreatorDialogOpen] = useState(false)
 
-  const handleBookmark = (postId: number) => {
-    setBookmarkedPosts((prev) => (prev.includes(postId) ? prev.filter((id) => id !== postId) : [...prev, postId]))
+  // Fetch dashboard data on component mount
+  useEffect(() => {
+    fetchDashboardData()
+  }, [])
+
+  const fetchDashboardData = async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
+
+      // Fetch dashboard data, posts, and subscriptions in parallel
+      const [dashboard, postsData, subscriptionsData] = await Promise.all([
+        dashboardApi.getDashboardData(),
+        postApi.getAllPosts(),
+        dashboardApi.getSubscriptions()
+      ])
+
+      setDashboardData(dashboard)
+      setPosts(postsData)
+      setSubscriptions(subscriptionsData)
+    } catch (err) {
+      console.error('Failed to fetch dashboard data:', err)
+      setError(err instanceof Error ? err.message : 'Failed to load dashboard data')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  const handleLike = (postId: number) => {
-    setLikedPosts((prev) => (prev.includes(postId) ? prev.filter((id) => id !== postId) : [...prev, postId]))
+  const handleBookmark = async (postId: string) => {
+    try {
+      setIsActionLoading(true)
+      // TODO: Implement bookmark API call when backend is ready
+      setBookmarkedPosts((prev) =>
+        prev.includes(postId)
+          ? prev.filter((id) => id !== postId)
+          : [...prev, postId]
+      )
+    } catch (err) {
+      console.error('Failed to bookmark post:', err)
+    } finally {
+      setIsActionLoading(false)
+    }
   }
 
-  const handlePurchase = (postId: number) => {
+  const handleLike = async (postId: string) => {
+    try {
+      setIsActionLoading(true)
+      await postApi.likePost(postId)
+      setLikedPosts((prev) =>
+        prev.includes(postId)
+          ? prev.filter((id) => id !== postId)
+          : [...prev, postId]
+      )
+      // Update the post's like count in state
+      setPosts(prev => prev.map(post =>
+        post._id === postId
+          ? { ...post, likes: (post.likes || 0) + 1 }
+          : post
+      ))
+    } catch (err) {
+      console.error('Failed to like post:', err)
+    } finally {
+      setIsActionLoading(false)
+    }
+  }
+
+  const handlePurchase = (postId: string) => {
     setIsLoading(true)
     // Simulate API call
     setTimeout(() => {
@@ -43,80 +107,42 @@ export function UserDashboard() {
     return <DashboardSkeleton />
   }
 
-  const featuredPosts = [
-    {
-      id: 1,
-      title: "The Future of AI in Content Creation",
-      author: "Sarah Johnson",
-      avatar: "/placeholder.svg?height=40&width=40",
-      readTime: "8 min read",
-      isPremium: true,
-      likes: 234,
-      category: "Technology",
-      excerpt: "Exploring how artificial intelligence is revolutionizing the way we create and consume content...",
-    },
-    {
-      id: 2,
-      title: "Building Sustainable Habits",
-      author: "Mike Chen",
-      avatar: "/placeholder.svg?height=40&width=40",
-      readTime: "5 min read",
-      isPremium: false,
-      likes: 156,
-      category: "Lifestyle",
-      excerpt: "Simple strategies to build habits that stick and transform your daily routine...",
-    },
-    {
-      id: 3,
-      title: "Advanced React Patterns",
-      author: "Emily Davis",
-      avatar: "/placeholder.svg?height=40&width=40",
-      readTime: "12 min read",
-      isPremium: true,
-      likes: 189,
-      category: "Programming",
-      excerpt: "Deep dive into advanced React patterns that will make your code more maintainable...",
-    },
-  ]
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-8">
+          <h2 className="text-2xl font-bold text-red-600">Error Loading Dashboard</h2>
+          <p className="text-muted-foreground mt-2">{error}</p>
+          <Button onClick={fetchDashboardData} className="mt-4">
+            Try Again
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
-  const subscriptions = [
-    {
-      author: "Sarah Johnson",
-      avatar: "/placeholder.svg?height=32&width=32",
-      plan: "Premium",
-      nextBilling: "2024-02-15",
-      price: "$9.99/month",
-    },
-    {
-      author: "Tech Weekly",
-      avatar: "/placeholder.svg?height=32&width=32",
-      plan: "Basic",
-      nextBilling: "2024-02-20",
-      price: "$4.99/month",
-    },
-  ]
+  // Calculate reading statistics from real data
+  const calculateReadingStats = () => {
+    const totalPosts = posts.length
+    const totalReadingTime = posts.reduce((sum, post) => {
+      // Estimate reading time: 200 words per minute
+      const wordCount = post.content.split(' ').length
+      return sum + Math.ceil(wordCount / 200)
+    }, 0)
 
-  const readingProgress = [
-    {
-      title: "Machine Learning Fundamentals",
-      author: "Dr. Alex Smith",
-      progress: 75,
-      timeLeft: "15 min left",
-    },
-    {
-      title: "Design Systems at Scale",
-      author: "Jessica Wong",
-      progress: 45,
-      timeLeft: "25 min left",
-    },
-  ]
+    return { totalPosts, totalReadingTime }
+  }
+
+  const readingStats = calculateReadingStats()
 
   return (
     <div className="space-y-6">
       {/* Welcome Section */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Welcome back, John!</h2>
+          <h2 className="text-3xl font-bold tracking-tight">
+            Welcome back, {dashboardData?.username || 'User'}!
+          </h2>
           <p className="text-muted-foreground">Discover amazing content from your favorite creators</p>
         </div>
         <div className="flex gap-2">
@@ -149,8 +175,8 @@ export function UserDashboard() {
             <BookOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">47</div>
-            <p className="text-xs text-muted-foreground">+12 from last month</p>
+            <div className="text-2xl font-bold">{readingStats.totalPosts}</div>
+            <p className="text-xs text-muted-foreground">Total posts viewed</p>
           </CardContent>
         </Card>
         <Card>
@@ -159,8 +185,8 @@ export function UserDashboard() {
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">24h</div>
-            <p className="text-xs text-muted-foreground">+3h from last month</p>
+            <div className="text-2xl font-bold">{readingStats.totalReadingTime}h</div>
+            <p className="text-xs text-muted-foreground">Estimated time spent reading</p>
           </CardContent>
         </Card>
         <Card>
@@ -169,8 +195,8 @@ export function UserDashboard() {
             <Bookmark className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">23</div>
-            <p className="text-xs text-muted-foreground">+5 this week</p>
+            <div className="text-2xl font-bold">{bookmarkedPosts.length}</div>
+            <p className="text-xs text-muted-foreground">Saved articles</p>
           </CardContent>
         </Card>
         <Card>
@@ -179,7 +205,7 @@ export function UserDashboard() {
             <Star className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">8</div>
+            <div className="text-2xl font-bold">{subscriptions.length}</div>
             <p className="text-xs text-muted-foreground">Active subscriptions</p>
           </CardContent>
         </Card>
@@ -201,84 +227,16 @@ export function UserDashboard() {
             </Button>
           </div>
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {featuredPosts.map((post) => (
-              <Card key={post.id} className="overflow-hidden">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <Badge variant="secondary">{post.category}</Badge>
-                    {post.isPremium && (
-                      <Badge className="gap-1">
-                        <Lock className="h-3 w-3" />
-                        {post.price}
-                      </Badge>
-                    )}
-                  </div>
-                  <CardTitle className="line-clamp-2">{post.title}</CardTitle>
-                  <CardDescription className="line-clamp-2">{post.excerpt}</CardDescription>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Avatar className="h-6 w-6">
-                        <AvatarImage src={post.avatar || "/placeholder.svg"} />
-                        <AvatarFallback>{post.author[0]}</AvatarFallback>
-                      </Avatar>
-                      <span className="text-sm text-muted-foreground">{post.author}</span>
-                    </div>
-                    <span className="text-sm text-muted-foreground">{post.readTime}</span>
-                  </div>
-                  <div className="mt-4 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <button
-                        className="flex items-center gap-1 hover:text-red-500 transition-colors"
-                        onClick={() => handleLike(post.id)}
-                      >
-                        <Heart
-                          className={`h-4 w-4 ${likedPosts.includes(post.id) ? "fill-red-500 text-red-500" : ""}`}
-                        />
-                        <span className="text-sm">{post.likes + (likedPosts.includes(post.id) ? 1 : 0)}</span>
-                      </button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleBookmark(post.id)}
-                        className={bookmarkedPosts.includes(post.id) ? "text-blue-500" : ""}
-                      >
-                        <Bookmark className={`h-4 w-4 ${bookmarkedPosts.includes(post.id) ? "fill-current" : ""}`} />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          navigator.share?.({
-                            title: post.title,
-                            url: window.location.href,
-                          }) || alert("Share functionality coming soon!")
-                        }}
-                      >
-                        <Share2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <Button size="sm" asChild>
-                      <a href={`/read/${post.id}?premium=${post.isPremium ? "1" : "0"}`}>Read</a>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="bookmarks" className="space-y-4">
-          <h3 className="text-xl font-semibold">Your Bookmarks</h3>
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {featuredPosts
-              .filter((p) => bookmarkedPosts.includes(p.id))
-              .map((post) => (
-                <Card key={post.id} className="overflow-hidden">
+            {posts.length === 0 ? (
+              <div className="col-span-full text-center py-8">
+                <p className="text-muted-foreground">No posts available yet. Check back later!</p>
+              </div>
+            ) : (
+              posts.slice(0, 6).map((post) => (
+                <Card key={post._id} className="overflow-hidden">
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
-                      <Badge variant="secondary">{post.category}</Badge>
+                      <Badge variant="secondary">Content</Badge>
                       {post.isPremium && (
                         <Badge className="gap-1">
                           <Lock className="h-3 w-3" />
@@ -287,59 +245,148 @@ export function UserDashboard() {
                       )}
                     </div>
                     <CardTitle className="line-clamp-2">{post.title}</CardTitle>
-                    <CardDescription className="line-clamp-2">{post.excerpt}</CardDescription>
+                    <CardDescription className="line-clamp-2">
+                      {post.content.substring(0, 150)}...
+                    </CardDescription>
                   </CardHeader>
                   <CardContent className="pt-0">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Avatar className="h-6 w-6">
-                          <AvatarImage src={post.avatar || "/placeholder.svg"} />
+                          <AvatarImage src="/placeholder.svg" />
                           <AvatarFallback>{post.author[0]}</AvatarFallback>
                         </Avatar>
                         <span className="text-sm text-muted-foreground">{post.author}</span>
                       </div>
-                      <span className="text-sm text-muted-foreground">{post.readTime}</span>
+                      <span className="text-sm text-muted-foreground">
+                        {Math.ceil(post.content.split(' ').length / 200)} min read
+                      </span>
                     </div>
                     <div className="mt-4 flex items-center justify-between">
                       <div className="flex items-center gap-4">
                         <button
                           className="flex items-center gap-1 hover:text-red-500 transition-colors"
-                          onClick={() => handleLike(post.id)}
+                          onClick={() => handleLike(post._id)}
+                          disabled={isActionLoading}
                         >
-                          <Heart className={`h-4 w-4 ${likedPosts.includes(post.id) ? "fill-red-500 text-red-500" : ""}`} />
-                          <span className="text-sm">{post.likes + (likedPosts.includes(post.id) ? 1 : 0)}</span>
+                          <Heart
+                            className={`h-4 w-4 ${likedPosts.includes(post._id) ? "fill-red-500 text-red-500" : ""}`}
+                          />
+                          <span className="text-sm">{post.likes || 0}</span>
                         </button>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleBookmark(post.id)}
-                          className={bookmarkedPosts.includes(post.id) ? "text-blue-500" : ""}
+                          onClick={() => handleBookmark(post._id)}
+                          disabled={isActionLoading}
+                          className={bookmarkedPosts.includes(post._id) ? "text-blue-500" : ""}
                         >
-                          <Bookmark className={`h-4 w-4 ${bookmarkedPosts.includes(post.id) ? "fill-current" : ""}`} />
+                          <Bookmark className={`h-4 w-4 ${bookmarkedPosts.includes(post._id) ? "fill-current" : ""}`} />
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => {
-                            navigator.share?.({ title: post.title, url: window.location.href }) || alert("Share functionality coming soon!")
+                            navigator.share?.({
+                              title: post.title,
+                              url: window.location.href,
+                            }) || alert("Share functionality coming soon!")
                           }}
                         >
                           <Share2 className="h-4 w-4" />
                         </Button>
                       </div>
                       <Button size="sm" asChild>
-                        <a href={`/read/${post.id}?premium=${post.isPremium ? "1" : "0"}`}>Read</a>
+                        <a href={`/read/${post._id}?premium=${post.isPremium ? "1" : "0"}`}>Read</a>
                       </Button>
                     </div>
                   </CardContent>
                 </Card>
-              ))}
-            {bookmarkedPosts.length === 0 && (
-              <Card>
-                <CardContent className="pt-6">
-                  <p className="text-sm text-muted-foreground">No bookmarks yet. Save articles to see them here.</p>
-                </CardContent>
-              </Card>
+              ))
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="bookmarks" className="space-y-4">
+          <h3 className="text-xl font-semibold">Your Bookmarks</h3>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {bookmarkedPosts.length === 0 ? (
+              <div className="col-span-full">
+                <Card>
+                  <CardContent className="pt-6 text-center">
+                    <p className="text-muted-foreground">No bookmarks yet. Save articles to see them here.</p>
+                  </CardContent>
+                </Card>
+              </div>
+            ) : (
+              posts
+                .filter((p) => bookmarkedPosts.includes(p._id))
+                .map((post) => (
+                  <Card key={post._id} className="overflow-hidden">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <Badge variant="secondary">Content</Badge>
+                        {post.isPremium && (
+                          <Badge className="gap-1">
+                            <Lock className="h-3 w-3" />
+                            Premium
+                          </Badge>
+                        )}
+                      </div>
+                      <CardTitle className="line-clamp-2">{post.title}</CardTitle>
+                      <CardDescription className="line-clamp-2">
+                        {post.content.substring(0, 150)}...
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-6 w-6">
+                            <AvatarImage src="/placeholder.svg" />
+                            <AvatarFallback>{post.author[0]}</AvatarFallback>
+                          </Avatar>
+                          <span className="text-sm text-muted-foreground">{post.author}</span>
+                        </div>
+                        <span className="text-sm text-muted-foreground">
+                          {Math.ceil(post.content.split(' ').length / 200)} min read
+                        </span>
+                      </div>
+                      <div className="mt-4 flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <button
+                            className="flex items-center gap-1 hover:text-red-500 transition-colors"
+                            onClick={() => handleLike(post._id)}
+                            disabled={isActionLoading}
+                          >
+                            <Heart className={`h-4 w-4 ${likedPosts.includes(post._id) ? "fill-red-500 text-red-500" : ""}`} />
+                            <span className="text-sm">{post.likes || 0}</span>
+                          </button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleBookmark(post._id)}
+                            disabled={isActionLoading}
+                            className={bookmarkedPosts.includes(post._id) ? "text-blue-500" : ""}
+                          >
+                            <Bookmark className={`h-4 w-4 ${bookmarkedPosts.includes(post._id) ? "fill-current" : ""}`} />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              navigator.share?.({ title: post.title, url: window.location.href }) || alert("Share functionality coming soon!")
+                            }}
+                          >
+                            <Share2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <Button size="sm" asChild>
+                          <a href={`/read/${post._id}?premium=${post.isPremium ? "1" : "0"}`}>Read</a>
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
             )}
           </div>
         </TabsContent>
@@ -367,6 +414,36 @@ export function UserDashboard() {
               </div>
             </CardContent>
           </Card>
+
+          {subscriptions.length > 0 && (
+            <>
+              <h3 className="text-xl font-semibold">Active Subscriptions</h3>
+              <div className="space-y-4">
+                {subscriptions.map((subscription) => (
+                  <Card key={subscription._id}>
+                    <CardContent className="pt-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-medium">Creator Subscription</h4>
+                          <p className="text-sm text-muted-foreground">
+                            {subscription.plan} Plan - ${subscription.price}/month
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <Badge variant={subscription.status === "active" ? "default" : "secondary"}>
+                            {subscription.status}
+                          </Badge>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Next billing: {new Date(subscription.nextBilling).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </>
+          )}
         </TabsContent>
       </Tabs>
 

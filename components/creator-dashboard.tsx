@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -10,20 +10,65 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PenTool, Eye, DollarSign, Users, TrendingUp, Calendar, Heart, MessageCircle, Edit, Trash2 } from "lucide-react"
 import { ContentSkeleton } from "@/components/loading-skeleton"
 import { useMembership } from "@/components/membership-provider"
+import { dashboardApi, postApi, Post, User, Subscription } from "@/lib/api"
 
 export function CreatorDashboard() {
-  const [isLoading, setIsLoading] = useState(false)
-  const [selectedPost, setSelectedPost] = useState<number | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isActionLoading, setIsActionLoading] = useState(false)
+  const [selectedPost, setSelectedPost] = useState<string | null>(null)
+  const [posts, setPosts] = useState<Post[]>([])
+  const [subscribers, setSubscribers] = useState<User[]>([])
+  const [dashboardData, setDashboardData] = useState<any>(null)
+  const [error, setError] = useState<string | null>(null)
   const { isPaidMember } = useMembership()
 
-  const handleEdit = (postId: number) => {
+  // Fetch dashboard data on component mount
+  useEffect(() => {
+    fetchDashboardData()
+  }, [])
+
+  const fetchDashboardData = async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
+
+      // Fetch dashboard data, posts, and subscribers in parallel
+      const [dashboard, postsData, subscribersData] = await Promise.all([
+        dashboardApi.getDashboardData(),
+        postApi.getAllPosts(),
+        dashboardApi.getSubscribers()
+      ])
+
+      setDashboardData(dashboard)
+      setPosts(postsData)
+      setSubscribers(subscribersData)
+    } catch (err) {
+      console.error('Failed to fetch dashboard data:', err)
+      setError(err instanceof Error ? err.message : 'Failed to load dashboard data')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleEdit = (postId: string) => {
     setSelectedPost(postId)
     alert("Content editor coming soon! Rich text editing with media support.")
   }
 
-  const handleDelete = (postId: number) => {
+  const handleDelete = async (postId: string) => {
     if (confirm("Are you sure you want to delete this post?")) {
-      alert("Delete functionality will be connected to your content management system.")
+      try {
+        setIsActionLoading(true)
+        await postApi.deletePost(postId)
+        // Remove the deleted post from state
+        setPosts(prev => prev.filter(post => post._id !== postId))
+        alert("Post deleted successfully!")
+      } catch (err) {
+        console.error('Failed to delete post:', err)
+        alert(err instanceof Error ? err.message : 'Failed to delete post')
+      } finally {
+        setIsActionLoading(false)
+      }
     }
   }
 
@@ -32,72 +77,53 @@ export function CreatorDashboard() {
     window.location.href = "/editor"
   }
 
-  const recentPosts = [
-    {
-      id: 1,
-      title: "The Future of AI in Content Creation",
-      status: "published",
-      views: 1234,
-      likes: 89,
-      comments: 23,
-      earnings: 45.67,
-      publishedAt: "2024-01-15",
-      isPremium: true,
-    },
-    {
-      id: 2,
-      title: "Building Better User Experiences",
-      status: "draft",
-      views: 0,
-      likes: 0,
-      comments: 0,
-      earnings: 0,
-      publishedAt: null,
-      isPremium: false,
-    },
-    {
-      id: 3,
-      title: "Advanced React Patterns Explained",
-      status: "published",
-      views: 892,
-      likes: 67,
-      comments: 15,
-      earnings: 32.45,
-      publishedAt: "2024-01-12",
-      isPremium: true,
-    },
-  ]
+  const handleLike = async (postId: string) => {
+    try {
+      await postApi.likePost(postId)
+      // Update the post's like count in state
+      setPosts(prev => prev.map(post =>
+        post._id === postId
+          ? { ...post, likes: (post.likes || 0) + 1 }
+          : post
+      ))
+    } catch (err) {
+      console.error('Failed to like post:', err)
+    }
+  }
 
-  const analytics = [
-    { month: "Jan", views: 1200, earnings: 89.5 },
-    { month: "Feb", views: 1800, earnings: 134.2 },
-    { month: "Mar", views: 2100, earnings: 156.8 },
-    { month: "Apr", views: 1900, earnings: 142.3 },
-  ]
+  // Calculate analytics from real data
+  const calculateAnalytics = () => {
+    const totalViews = posts.reduce((sum, post) => sum + (post.views || 0), 0)
+    const totalLikes = posts.reduce((sum, post) => sum + (post.likes || 0), 0)
+    const totalComments = posts.reduce((sum, post) => sum + (post.comments || 0), 0)
+    const totalEarnings = posts.reduce((sum, post) => {
+      if (post.isPremium && post.price) {
+        return sum + (post.price * 0.8) // Assuming 80% creator revenue
+      }
+      return sum
+    }, 0)
 
-  const subscribers = [
-    {
-      name: "Alice Johnson",
-      avatar: "/placeholder.svg?height=32&width=32",
-      plan: "Premium",
-      joinedAt: "2024-01-10",
-    },
-    {
-      name: "Bob Smith",
-      avatar: "/placeholder.svg?height=32&width=32",
-      plan: "Basic",
-      joinedAt: "2024-01-08",
-    },
-    {
-      name: "Carol Davis",
-      avatar: "/placeholder.svg?height=32&width=32",
-      plan: "Premium",
-      joinedAt: "2024-01-05",
-    },
-  ]
+    return { totalViews, totalLikes, totalComments, totalEarnings }
+  }
+
+  const analytics = calculateAnalytics()
 
   if (isLoading) {
     return <ContentSkeleton />
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-8">
+          <h2 className="text-2xl font-bold text-red-600">Error Loading Dashboard</h2>
+          <p className="text-muted-foreground mt-2">{error}</p>
+          <Button onClick={fetchDashboardData} className="mt-4">
+            Try Again
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -106,7 +132,9 @@ export function CreatorDashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Creator Dashboard</h2>
-          <p className="text-muted-foreground">Manage your content and track your success</p>
+          <p className="text-muted-foreground">
+            Welcome back, {dashboardData?.username || 'Creator'}!
+          </p>
         </div>
         <Button className="gap-2" onClick={handleNewPost}>
           <PenTool className="h-4 w-4" />
@@ -122,8 +150,8 @@ export function CreatorDashboard() {
             <Eye className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">12,847</div>
-            <p className="text-xs text-muted-foreground">+18% from last month</p>
+            <div className="text-2xl font-bold">{analytics.totalViews.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">All time views</p>
           </CardContent>
         </Card>
         <Card>
@@ -132,8 +160,8 @@ export function CreatorDashboard() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">$1,247</div>
-            <p className="text-xs text-muted-foreground">+12% from last month</p>
+            <div className="text-2xl font-bold">${analytics.totalEarnings.toFixed(2)}</div>
+            <p className="text-xs text-muted-foreground">All time earnings</p>
           </CardContent>
         </Card>
         <Card>
@@ -142,8 +170,8 @@ export function CreatorDashboard() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">342</div>
-            <p className="text-xs text-muted-foreground">+23 this month</p>
+            <div className="text-2xl font-bold">{subscribers.length}</div>
+            <p className="text-xs text-muted-foreground">Active subscribers</p>
           </CardContent>
         </Card>
         <Card>
@@ -152,8 +180,12 @@ export function CreatorDashboard() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">7.2%</div>
-            <p className="text-xs text-muted-foreground">+0.8% from last month</p>
+            <div className="text-2xl font-bold">
+              {analytics.totalViews > 0
+                ? ((analytics.totalLikes + analytics.totalComments) / analytics.totalViews * 100).toFixed(1)
+                : 0}%
+            </div>
+            <p className="text-xs text-muted-foreground">Likes + Comments / Views</p>
           </CardContent>
         </Card>
       </div>
@@ -168,57 +200,90 @@ export function CreatorDashboard() {
 
         <TabsContent value="posts" className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-xl font-semibold">My Posts</h3>
+            <h3 className="text-xl font-semibold">My Posts ({posts.length})</h3>
             <Button variant="outline" size="sm">
               <Calendar className="mr-2 h-4 w-4" />
               Schedule Post
             </Button>
           </div>
           <div className="space-y-4">
-            {recentPosts.map((post) => (
-              <Card key={post.id}>
-                <CardContent className="pt-6">
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-medium">{post.title}</h4>
-                        <Badge variant={post.status === "published" ? "default" : "secondary"}>{post.status}</Badge>
-                        {post.isPremium && <Badge variant="outline">Premium</Badge>}
-                      </div>
-                      {post.publishedAt && (
-                        <p className="text-sm text-muted-foreground">Published on {post.publishedAt}</p>
-                      )}
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="ghost" size="sm" onClick={() => handleEdit(post.id)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleDelete(post.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="flex items-center gap-2">
-                      <Eye className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm">{post.views.toLocaleString()}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Heart className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm">{post.likes}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <MessageCircle className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm">{post.comments}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm">${post.earnings.toFixed(2)}</span>
-                    </div>
-                  </div>
+            {posts.length === 0 ? (
+              <Card>
+                <CardContent className="pt-6 text-center">
+                  <p className="text-muted-foreground">No posts yet. Create your first post to get started!</p>
+                  <Button onClick={handleNewPost} className="mt-4">
+                    <PenTool className="mr-2 h-4 w-4" />
+                    Write Your First Post
+                  </Button>
                 </CardContent>
               </Card>
-            ))}
+            ) : (
+              posts.map((post) => (
+                <Card key={post._id}>
+                  <CardContent className="pt-6">
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-medium">{post.title}</h4>
+                          <Badge variant={post.status === "published" ? "default" : "secondary"}>
+                            {post.status}
+                          </Badge>
+                          {post.isPremium && (
+                            <Badge variant="outline">
+                              Premium ${post.price}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {post.status === "published"
+                            ? `Published on ${new Date(post.createdAt).toLocaleDateString()}`
+                            : `Last updated: ${new Date(post.updatedAt).toLocaleDateString()}`
+                          }
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEdit(post._id)}
+                          disabled={isActionLoading}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(post._id)}
+                          disabled={isActionLoading}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="flex items-center gap-2">
+                        <Eye className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm">{post.views?.toLocaleString() || 0}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Heart className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm">{post.likes || 0}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <MessageCircle className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm">{post.comments || 0}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm">
+                          ${post.isPremium && post.price ? (post.price * 0.8).toFixed(2) : '0.00'}
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
           </div>
         </TabsContent>
 
@@ -227,39 +292,64 @@ export function CreatorDashboard() {
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>Monthly Views</CardTitle>
-                <CardDescription>Your content views over time</CardDescription>
+                <CardTitle>Content Overview</CardTitle>
+                <CardDescription>Your content performance metrics</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  {analytics.map((data, index) => (
-                    <div key={index} className="flex items-center justify-between">
-                      <span className="text-sm">{data.month}</span>
-                      <div className="flex items-center gap-2">
-                        <Progress value={(data.views / 2500) * 100} className="w-20" />
-                        <span className="text-sm font-medium">{data.views}</span>
-                      </div>
-                    </div>
-                  ))}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Total Posts</span>
+                    <span className="text-sm font-medium">{posts.length}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Published Posts</span>
+                    <span className="text-sm font-medium">
+                      {posts.filter(p => p.status === 'published').length}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Premium Posts</span>
+                    <span className="text-sm font-medium">
+                      {posts.filter(p => p.isPremium).length}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Draft Posts</span>
+                    <span className="text-sm font-medium">
+                      {posts.filter(p => p.status === 'draft').length}
+                    </span>
+                  </div>
                 </div>
               </CardContent>
             </Card>
             <Card>
               <CardHeader>
-                <CardTitle>Monthly Earnings</CardTitle>
-                <CardDescription>Your revenue over time</CardDescription>
+                <CardTitle>Engagement Metrics</CardTitle>
+                <CardDescription>How your audience interacts with content</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  {analytics.map((data, index) => (
-                    <div key={index} className="flex items-center justify-between">
-                      <span className="text-sm">{data.month}</span>
-                      <div className="flex items-center gap-2">
-                        <Progress value={(data.earnings / 200) * 100} className="w-20" />
-                        <span className="text-sm font-medium">${data.earnings}</span>
-                      </div>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Total Views</span>
+                    <div className="flex items-center gap-2">
+                      <Progress value={Math.min((analytics.totalViews / 10000) * 100, 100)} className="w-20" />
+                      <span className="text-sm font-medium">{analytics.totalViews}</span>
                     </div>
-                  ))}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Total Likes</span>
+                    <div className="flex items-center gap-2">
+                      <Progress value={Math.min((analytics.totalLikes / 1000) * 100, 100)} className="w-20" />
+                      <span className="text-sm font-medium">{analytics.totalLikes}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Total Comments</span>
+                    <div className="flex items-center gap-2">
+                      <Progress value={Math.min((analytics.totalComments / 500) * 100, 100)} className="w-20" />
+                      <span className="text-sm font-medium">{analytics.totalComments}</span>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -268,32 +358,40 @@ export function CreatorDashboard() {
 
         <TabsContent value="subscribers" className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-xl font-semibold">Recent Subscribers</h3>
+            <h3 className="text-xl font-semibold">Your Subscribers ({subscribers.length})</h3>
             <Button variant="outline" size="sm">
               <Users className="mr-2 h-4 w-4" />
               View All
             </Button>
           </div>
           <div className="space-y-4">
-            {subscribers.map((subscriber, index) => (
-              <Card key={index}>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Avatar>
-                        <AvatarImage src={subscriber.avatar || "/placeholder.svg"} />
-                        <AvatarFallback>{subscriber.name[0]}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <h4 className="font-medium">{subscriber.name}</h4>
-                        <p className="text-sm text-muted-foreground">Joined {subscriber.joinedAt}</p>
-                      </div>
-                    </div>
-                    <Badge variant={subscriber.plan === "Premium" ? "default" : "secondary"}>{subscriber.plan}</Badge>
-                  </div>
+            {subscribers.length === 0 ? (
+              <Card>
+                <CardContent className="pt-6 text-center">
+                  <p className="text-muted-foreground">No subscribers yet. Keep creating great content to attract readers!</p>
                 </CardContent>
               </Card>
-            ))}
+            ) : (
+              subscribers.map((subscriber, index) => (
+                <Card key={subscriber._id || index}>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Avatar>
+                          <AvatarImage src={subscriber.profilePic || "/placeholder.svg"} />
+                          <AvatarFallback>{subscriber.username[0]}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <h4 className="font-medium">{subscriber.username}</h4>
+                          <p className="text-sm text-muted-foreground">{subscriber.email}</p>
+                        </div>
+                      </div>
+                      <Badge variant="default">Active</Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
           </div>
         </TabsContent>
 
@@ -305,17 +403,17 @@ export function CreatorDashboard() {
                 <CardTitle>This Month</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">$156.80</div>
-                <p className="text-xs text-muted-foreground">+12% from last month</p>
+                <div className="text-2xl font-bold">${analytics.totalEarnings.toFixed(2)}</div>
+                <p className="text-xs text-muted-foreground">From premium content</p>
               </CardContent>
             </Card>
             <Card>
               <CardHeader>
-                <CardTitle>Pending Payout</CardTitle>
+                <CardTitle>Premium Posts</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">$89.45</div>
-                <p className="text-xs text-muted-foreground">Available in 3 days</p>
+                <div className="text-2xl font-bold">{posts.filter(p => p.isPremium).length}</div>
+                <p className="text-xs text-muted-foreground">Monetized content</p>
               </CardContent>
             </Card>
             <Card>
@@ -323,35 +421,36 @@ export function CreatorDashboard() {
                 <CardTitle>Total Earned</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">$1,247.30</div>
+                <div className="text-2xl font-bold">${analytics.totalEarnings.toFixed(2)}</div>
                 <p className="text-xs text-muted-foreground">All time earnings</p>
               </CardContent>
             </Card>
           </div>
           <Card>
             <CardHeader>
-              <CardTitle>Payout Settings</CardTitle>
-              <CardDescription>Manage your payment preferences</CardDescription>
+              <CardTitle>Revenue Breakdown</CardTitle>
+              <CardDescription>Earnings from your premium content</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">PayPal</p>
-                  <p className="text-sm text-muted-foreground">john@example.com</p>
+              {posts.filter(p => p.isPremium && p.price).map((post) => (
+                <div key={post._id} className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">{post.title}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Published {new Date(post.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-medium">${(post.price! * 0.8).toFixed(2)}</p>
+                    <p className="text-xs text-muted-foreground">80% of ${post.price}</p>
+                  </div>
                 </div>
-                <Button variant="outline" size="sm">
-                  Update
-                </Button>
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Minimum Payout</p>
-                  <p className="text-sm text-muted-foreground">$50.00</p>
-                </div>
-                <Button variant="outline" size="sm">
-                  Change
-                </Button>
-              </div>
+              ))}
+              {posts.filter(p => p.isPremium && p.price).length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No premium content yet. Create premium posts to start earning!
+                </p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
